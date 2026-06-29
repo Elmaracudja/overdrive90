@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OVERDRIVE 90 - Arcade Cabinet</title>
+    <style>
+        /* Styles globaux pour centrer la borne à l'écran */
+        body {
+            background-color: #05050a;
+            color: #fff;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* Conteneur principal simulant le meuble de la borne d'arcade */
+        .arcade-cabinet {
+            background: linear-gradient(145px, #151525, #080812);
+            border-left: 20px solid #d91414; /* Side-art latéral rouge rétro */
+            border-right: 20px solid #d91414;
+            border-top: 10px solid #333;
+            border-bottom: 30px solid #222;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 0 50px rgba(217, 20, 20, 0.3), inset 0 0 20px #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Le bandeau lumineux du haut (Marquee) avec effet néon */
+        .marquee {
+            background: #000;
+            border: 3px solid #ff0055;
+            padding: 10px 40px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: 1.8rem;
+            color: #00ffcc;
+            text-shadow: 0 0 10px #00ffcc, 2px 2px #ff0055;
+            letter-spacing: 3px;
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.4);
+            text-transform: uppercase;
+        }
+
+        /* Le bezel (le contour de protection en plastique noir autour de l'écran CRT) */
+        .bezel {
+            background: linear-gradient(to bottom, #1e1e1e, #111111);
+            padding: 25px;
+            border-radius: 30px;
+            box-shadow: inset 0 0 30px #000, 0 10px 20px rgba(0,0,0,0.8);
+            border: 4px solid #2a2a2a;
+        }
+
+        /* L'écran du jeu. Rendu des pixels net sans flou (crisp-edges) */
+        canvas {
+            background: #000;
+            border: 10px solid #0a0a0a;
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 1);
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-crisp-edges;
+            width: 640px;  /* Résolution 320x240 étirée proprement à l'affichage */
+            height: 480px; 
+            display: block;
+        }
+
+        /* Le panneau de contrôle sous l'écran */
+        .control-panel {
+            margin-top: 20px;
+            width: 100%;
+            text-align: center;
+            font-size: 0.75rem;
+            color: #667;
+            text-transform: uppercase;
+            border-top: 2px dashed #334;
+            padding-top: 15px;
+        }
+        
+        .highlight { 
+            color: #ff0055; 
+            font-weight: bold; 
+        }
+    </style>
+</head>
+<body>
+
+    <div class="arcade-cabinet">
+        <div class="marquee">OVERDRIVE 90</div>
+        
+        <div class="bezel">
+            <canvas id="gameCanvas" width="320" height="240"></canvas>
+        </div>
+        
+        <div class="control-panel">
+            🕹️ JOYSTICK: <span class="highlight">[FLÈCHES]</span> DIRIGER / ACCÉLÉRER | 🔴 BOUTON A: <span class="highlight">[ESPACE]</span> NITRO N2O
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
