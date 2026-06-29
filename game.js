@@ -8,44 +8,40 @@ class Game {
         this.fpsInterval = 1000 / this.fps;
         this.lastTime = 0;
         
-        // Position et cinématique du joueur
+        // Position et cinématique
         this.position = 0;   
         this.speed = 0;      
         this.maxSpeed = 250; 
         
-        // Configuration géométrique de la route
-        this.roadWidth = 1400;     
-        this.segmentLength = 200;  
-        this.cameraHeight = 1000;  
-        this.cameraDepth = 0.8;    
-        this.drawDistance = 40;    
+        // Configuration géométrique ULTRA-STABLE
+        this.roadWidth = 1200;      // Largeur virtuelle de la route
+        this.segmentLength = 200;   // Longueur d'une bande de couleur
+        this.drawDistance = 40;     // Nombre de bandes dessinées
+        this.cameraHeight = 1000;   // Hauteur virtuelle
 
-        // Génération de la carte du circuit (Tableau de segments)
+        // Génération de la piste (Demoscene Circuit)
         this.segments = [];
         this.createRoute();
 
+        // Contrôles clavier
         this.keys = { up: false, down: false, left: false, right: false, space: false };
         this.setupInput();
         
         requestAnimationFrame((time) => this.gameLoop(time));
     }
 
-    // Génération d'une piste avec des lignes droites et des virages
+    // Création d'un circuit test avec des courbes
     createRoute() {
-        // On génère 1000 segments de route pour tester
-        for (let i = 0; i < 1000; i++) {
+        this.segments = [];
+        for (let i = 0; i < 2000; i++) {
             let curve = 0;
-            // On ajoute des virages artificiels selon la zone du circuit
-            if (i > 100 && i < 200) curve = 1.5;   // Virage léger à droite
-            if (i > 250 && i < 350) curve = -2.5;  // Virage serré à gauche
-            if (i > 400 && i < 600) curve = 3;     // Longue courbe S à droite
+            if (i > 150 && i < 300) curve = 2.0;    // Virage à droite serré
+            if (i > 400 && i < 600) curve = -1.5;   // Courbe à gauche longue
+            if (i > 800 && i < 1100) curve = 3.0;   // Virage très serré droite (épingle)
             
             this.segments.push({
                 index: i,
-                curve: curve,
-                // Coordonnées de base dans le monde virtuel
-                p1: { world: { x: 0, y: 0, z: i * this.segmentLength } },
-                p2: { world: { x: 0, y: 0, z: (i + 1) * this.segmentLength } }
+                curve: curve
             });
         }
     }
@@ -89,7 +85,6 @@ class Game {
         this.speed = Math.max(0, Math.min(this.speed, this.maxSpeed));
         this.position += this.speed;
 
-        // Boucler sur la piste si on arrive à la fin
         let trackLength = this.segments.length * this.segmentLength;
         if (this.position >= trackLength) this.position -= trackLength;
     }
@@ -97,78 +92,77 @@ class Game {
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         
-        // 1. Rendu du ciel
+        // 1. Rendu du CIEL
         this.ctx.fillStyle = "#111424";
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height / 2);
         
-        // 2. Rendu de la route corrigé
-        let baseSegmentIndex = Math.floor(this.position / this.segmentLength);
-        let basePercent = (this.position % this.segmentLength) / this.segmentLength;
+        // 2. RENDU DE LA ROUTE (Nouvel algorithme ULTRA-STABLE)
+        let H = this.canvas.height / 2; // Hauteur de l'horizon
+        let W = this.canvas.width / 2; // Centre horizontal
         
-        let dx = 0;
-        let camUserX = 0; // Position latérale future de la voiture
+        // Accumulateur pour la courbure cumulée (Virages)
+        let curveX = 0;
         
-        // Accumulateur pour la courbure de la route
-        let currentCurve = 0;
-
-        // Rendu de l'arrière vers l'avant
-        for (let i = this.drawDistance - 1; i >= 0; i--) {
-            let segment = this.segments[(baseSegmentIndex + i) % this.segments.length];
+        // On dessine de l'AVANT (bas de l'écran) vers le FOND (horizon)
+        for (let i = 0; i < this.drawDistance; i++) {
+            let segmentIndex = Math.floor(this.position / this.segmentLength) + i;
+            let segment = this.segments[segmentIndex % this.segments.length];
             
             let isDark = (segment.index % 2 === 0);
-            let roadColor = isDark ? "#42444d" : "#4c4e57";
-            let snowColor = isDark ? "#ffffff" : "#f0f4f8";
-            let borderColor = isDark ? "#ff0055" : "#ffffff"; // Vibreurs rouge/blanc style arcade
+            let roadColor = isDark ? "#42444d" : "#4c4e57"; // Asphalte froid
+            let snowColor = isDark ? "#ffffff" : "#f0f4f8"; // Neige alpine
+            let borderColor = isDark ? "#ff0055" : "#ffffff"; // Vibreurs style Arcade
 
-            // Calcul de la perspective de manière stable
-            let z = (i * this.segmentLength) - (this.position % this.segmentLength);
-            if (z <= 0) z = 1; // Anti-division par zéro
+            // Calcul de la perspective fixe et stable
+            // Nous utilisons une échelle linéaire simple pour garantir le rendu
+            let scale1 = 1 - (i / this.drawDistance); 
+            let scale2 = 1 - ((i + 1) / this.drawDistance);
 
-            let scale = this.cameraDepth / (z / this.cameraHeight);
+            if (scale1 < 0) scale1 = 0;
+            if (scale2 < 0) scale2 = 0;
+
+            // Déterminer les coordonnées Y de la bande horizontale
+            let yA = this.canvas.height / 2 + (H * scale1);
+            let yB = this.canvas.height / 2 + (H * scale2);
             
-            // Calcul des projections écran
-            let screenX = (this.canvas.width / 2) + (currentCurve * scale * (this.canvas.width / 2));
-            let screenY = (this.canvas.height / 2) + (this.cameraHeight * scale * (this.canvas.height / 2)) / this.cameraHeight;
-            let screenW = this.roadWidth * scale;
+            if (yA <= yB) continue; // Sécurité si division par zéro
 
-            // Variables pour le segment précédent (plus loin sur l'écran)
-            let nextZ = ((i + 1) * this.segmentLength) - (this.position % this.segmentLength);
-            let nextScale = this.cameraDepth / (nextZ / this.cameraHeight);
-            currentCurve += segment.curve; // On applique la courbure au fur et à mesure
-            let nextScreenX = (this.canvas.width / 2) + (currentCurve * nextScale * (this.canvas.width / 2));
-            let nextScreenY = (this.canvas.height / 2) + (this.cameraHeight * nextScale * (this.canvas.height / 2)) / this.cameraHeight;
-            let nextScreenW = this.roadWidth * nextScale;
-
-            // Ajustement des Y pour correspondre à notre plancher bas
-            let yA = screenY;
-            let yB = nextScreenY;
+            // Déterminer le décalage horizontal cumulé (Virages)
+            let xA = W + (curveX * scale1 * W * 0.1); // On décaler le centre selon la courbe
+            let xB = W + (curveX * scale2 * W * 0.1);
             
-            if (yA <= yB) continue;
+            // Calculer la largeur projetée (perspective)
+            let wA = this.roadWidth * scale1;
+            let wB = this.roadWidth * scale2;
 
-            // Dessin du sol enneigé
+            // Dessin du SOL ENNEIGÉ (Fond de la bande)
             this.ctx.fillStyle = snowColor;
             this.ctx.fillRect(0, yB, this.canvas.width, yA - yB);
 
-            // Dessin des vibreurs extérieurs
-            let borderWidth = screenW * 0.1;
+            // Dessin des VIBREURS LATÉRAUX (Borders)
+            let borderWidthA = wA * 0.1;
+            let borderWidthB = wB * 0.1;
             this.ctx.fillStyle = borderColor;
             this.ctx.beginPath();
-            this.ctx.moveTo(nextScreenX - nextScreenW/2 - borderWidth, yB);
-            this.ctx.lineTo(nextScreenX + nextScreenW/2 + borderWidth, yB);
-            this.ctx.lineTo(screenX + screenW/2 + borderWidth, yA);
-            this.ctx.lineTo(screenX - screenW/2 - borderWidth, yA);
+            this.ctx.moveTo(xB - wB / 2 - borderWidthB, yB);
+            this.ctx.lineTo(xB + wB / 2 + borderWidthB, yB);
+            this.ctx.lineTo(xA + wA / 2 + borderWidthA, yA);
+            this.ctx.lineTo(xA - wA / 2 - borderWidthA, yA);
             this.ctx.closePath();
             this.ctx.fill();
 
-            // Dessin de la route
+            // Dessin de l'ASPHALTE (Route)
             this.ctx.fillStyle = roadColor;
             this.ctx.beginPath();
-            this.ctx.moveTo(nextScreenX - nextScreenW / 2, yB);
-            this.ctx.lineTo(nextScreenX + nextScreenW / 2, yB);
-            this.ctx.lineTo(screenX + screenW / 2, yA);
-            this.ctx.lineTo(screenX - screenW / 2, yA);
+            this.ctx.moveTo(xB - wB / 2, yB);
+            this.ctx.lineTo(xB + wB / 2, yB);
+            this.ctx.lineTo(xA + wA / 2, yA);
+            this.ctx.lineTo(xA - wA / 2, yA);
             this.ctx.closePath();
             this.ctx.fill();
+            
+            // On accumule la courbure pour le segment suivant
+            curveX += segment.curve; 
         }
 
         // 3. HUD Écran
@@ -177,6 +171,8 @@ class Game {
         this.ctx.fillText(`VITESSE: ${Math.floor(this.speed)} KM/H`, 12, 18);
         this.ctx.fillStyle = "#00ffcc";
         this.ctx.fillText(`DISTANCE: ${Math.floor(this.position / 100)} M`, 12, 32);
+        this.ctx.fillStyle = "#ffffff";
+        this.ctx.fillText("STAGE 1 (CURVE OK)", 12, 46);
     }
 }
 
