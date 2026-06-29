@@ -8,18 +8,19 @@ class Game {
         this.fpsInterval = 1000 / this.fps;
         this.lastTime = 0;
         
-        // Position et cinématique
-        this.position = 0;   
-        this.speed = 0;      
-        this.maxSpeed = 250; 
+        // Position et cinématique de la voiture
+        this.position = 0;      // Distance totale parcourue
+        this.speed = 0;         // Vitesse actuelle (en unités)
+        this.maxSpeed = 250;    // Vitesse maximale Palier 1
+        this.playerX = 0;       // Position latérale de la voiture (-1 = bord gauche, 1 = bord droit)
         
-        // Configuration géométrique ULTRA-STABLE
-        this.roadWidth = 1200;      // Largeur virtuelle de la route
-        this.segmentLength = 200;   // Longueur d'une bande de couleur
-        this.drawDistance = 40;     // Nombre de bandes dessinées
-        this.cameraHeight = 1000;   // Hauteur virtuelle
+        // Configuration géométrique de la route
+        this.roadWidth = 1200;      
+        this.segmentLength = 200;   
+        this.drawDistance = 40;     
+        this.cameraHeight = 1000;   
 
-        // Génération de la piste (Demoscene Circuit)
+        // Génération du circuit
         this.segments = [];
         this.createRoute();
 
@@ -30,14 +31,13 @@ class Game {
         requestAnimationFrame((time) => this.gameLoop(time));
     }
 
-    // Création d'un circuit test avec des courbes
     createRoute() {
         this.segments = [];
         for (let i = 0; i < 2000; i++) {
             let curve = 0;
-            if (i > 150 && i < 300) curve = 2.0;    // Virage à droite serré
-            if (i > 400 && i < 600) curve = -1.5;   // Courbe à gauche longue
-            if (i > 800 && i < 1100) curve = 3.0;   // Virage très serré droite (épingle)
+            if (i > 100 && i < 250) curve = 2.0;    // Virage à droite
+            if (i > 350 && i < 500) curve = -2.0;   // Virage à gauche
+            if (i > 600 && i < 800) curve = 3.5;    // Épingle serrée à droite
             
             this.segments.push({
                 index: i,
@@ -75,16 +75,39 @@ class Game {
     }
 
     update(dt) {
+        // 1. Gestion de la vitesse linéaire
         if (this.keys.up) {
             this.speed += 140 * dt;
         } else {
-            this.speed -= 90 * dt; 
+            this.speed -= 90 * dt; // Friction de la neige
         }
-        if (this.keys.down) this.speed -= 180 * dt;
+        if (this.keys.down) this.speed -= 180 * dt; // Frein
 
         this.speed = Math.max(0, Math.min(this.speed, this.maxSpeed));
         this.position += this.speed;
 
+        // 2. Gestion de la direction latérale (uniquement si la voiture roule)
+        if (this.speed > 0) {
+            // Facteur multiplicateur pour tourner de manière proportionnelle à la vitesse
+            let turnSpeed = 1.2 * (this.speed / this.maxSpeed) * dt;
+            
+            if (this.keys.left)  this.playerX -= turnSpeed;
+            if (this.keys.right) this.playerX += turnSpeed;
+        }
+
+        // 3. Force centrifuge : le virage pousse la voiture vers l'extérieur !
+        let baseSegmentIndex = Math.floor(this.position / this.segmentLength);
+        let currentSegment = this.segments[baseSegmentIndex % this.segments.length];
+        
+        // Si on roule dans un virage, la force centrifuge dérive la trajectoire
+        if (currentSegment.curve !== 0 && this.speed > 0) {
+            this.playerX -= currentSegment.curve * 0.15 * (this.speed / this.maxSpeed) * dt;
+        }
+
+        // Limitation des bords de l'écran pour pas s'envoler (glissière imaginaire)
+        this.playerX = Math.max(-2, Math.min(this.playerX, 2));
+
+        // Boucle du circuit
         let trackLength = this.segments.length * this.segmentLength;
         if (this.position >= trackLength) this.position -= trackLength;
     }
@@ -92,54 +115,44 @@ class Game {
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         
-        // 1. Rendu du CIEL
+        // 1. Rendu du ciel
         this.ctx.fillStyle = "#111424";
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height / 2);
         
-        // 2. RENDU DE LA ROUTE (Nouvel algorithme ULTRA-STABLE)
-        let H = this.canvas.height / 2; // Hauteur de l'horizon
-        let W = this.canvas.width / 2; // Centre horizontal
-        
-        // Accumulateur pour la courbure cumulée (Virages)
+        // 2. Rendu de la route avec décalage de la caméra joueur (playerX)
+        let H = this.canvas.height / 2; 
+        let W = this.canvas.width / 2; 
         let curveX = 0;
         
-        // On dessine de l'AVANT (bas de l'écran) vers le FOND (horizon)
         for (let i = 0; i < this.drawDistance; i++) {
             let segmentIndex = Math.floor(this.position / this.segmentLength) + i;
             let segment = this.segments[segmentIndex % this.segments.length];
             
             let isDark = (segment.index % 2 === 0);
-            let roadColor = isDark ? "#42444d" : "#4c4e57"; // Asphalte froid
-            let snowColor = isDark ? "#ffffff" : "#f0f4f8"; // Neige alpine
-            let borderColor = isDark ? "#ff0055" : "#ffffff"; // Vibreurs style Arcade
+            let roadColor = isDark ? "#42444d" : "#4c4e57"; 
+            let snowColor = isDark ? "#ffffff" : "#f0f4f8"; 
+            let borderColor = isDark ? "#ff0055" : "#ffffff"; 
 
-            // Calcul de la perspective fixe et stable
-            // Nous utilisons une échelle linéaire simple pour garantir le rendu
             let scale1 = 1 - (i / this.drawDistance); 
             let scale2 = 1 - ((i + 1) / this.drawDistance);
 
-            if (scale1 < 0) scale1 = 0;
-            if (scale2 < 0) scale2 = 0;
-
-            // Déterminer les coordonnées Y de la bande horizontale
             let yA = this.canvas.height / 2 + (H * scale1);
             let yB = this.canvas.height / 2 + (H * scale2);
             
-            if (yA <= yB) continue; // Sécurité si division par zéro
+            if (yA <= yB) continue; 
 
-            // Déterminer le décalage horizontal cumulé (Virages)
-            let xA = W + (curveX * scale1 * W * 0.1); // On décaler le centre selon la courbe
-            let xB = W + (curveX * scale2 * W * 0.1);
+            // Application du décalage de la caméra (playerX) proportionnellement à la distance
+            let xA = W + (curveX - this.playerX * 80) * scale1; 
+            let xB = W + (curveX + segment.curve - this.playerX * 80) * scale2;
             
-            // Calculer la largeur projetée (perspective)
             let wA = this.roadWidth * scale1;
             let wB = this.roadWidth * scale2;
 
-            // Dessin du SOL ENNEIGÉ (Fond de la bande)
+            // Neige
             this.ctx.fillStyle = snowColor;
             this.ctx.fillRect(0, yB, this.canvas.width, yA - yB);
 
-            // Dessin des VIBREURS LATÉRAUX (Borders)
+            // Vibreurs
             let borderWidthA = wA * 0.1;
             let borderWidthB = wB * 0.1;
             this.ctx.fillStyle = borderColor;
@@ -151,7 +164,7 @@ class Game {
             this.ctx.closePath();
             this.ctx.fill();
 
-            // Dessin de l'ASPHALTE (Route)
+            // Route
             this.ctx.fillStyle = roadColor;
             this.ctx.beginPath();
             this.ctx.moveTo(xB - wB / 2, yB);
@@ -161,18 +174,47 @@ class Game {
             this.ctx.closePath();
             this.ctx.fill();
             
-            // On accumule la courbure pour le segment suivant
             curveX += segment.curve; 
         }
 
-        // 3. HUD Écran
+        // 3. DESSIN DE LA VOITURE DU JOUEUR (Modèle Rétro Vectoriel temporaire)
+        let carW = 55;
+        let carH = 26;
+        let carX = W - (carW / 2); // Centré par défaut sur l'écran
+        let carY = this.canvas.height - carH - 15; // Placé en bas de l'écran
+
+        // Châssis principal (Coupe Sport Rouge)
+        this.ctx.fillStyle = "#d91414"; 
+        this.ctx.fillRect(carX, carY + 8, carW, carH - 8);
+        
+        // Cockpit / Vitres
+        this.ctx.fillStyle = "#a3c2c2"; 
+        this.ctx.fillRect(carX + 12, carY, carW - 24, 8);
+
+        // Phares Arrière (Mode course poursuite de nuit)
+        this.ctx.fillStyle = "#ff3333";
+        this.ctx.fillRect(carX + 2, carY + 10, 8, 4); // Phare gauche
+        this.ctx.fillRect(carX + carW - 10, carY + 10, 8, 4); // Phare droit
+
+        // Pneus (Visibles sous la carrosserie)
+        this.ctx.fillStyle = "#111";
+        this.ctx.fillRect(carX + 4, carY + carH - 2, 10, 3);
+        this.ctx.fillRect(carX + carW - 14, carY + carH - 2, 10, 3);
+
+        // 4. HUD Écran
         this.ctx.fillStyle = "#ff0055";
         this.ctx.font = "9px 'Courier New'";
         this.ctx.fillText(`VITESSE: ${Math.floor(this.speed)} KM/H`, 12, 18);
         this.ctx.fillStyle = "#00ffcc";
         this.ctx.fillText(`DISTANCE: ${Math.floor(this.position / 100)} M`, 12, 32);
-        this.ctx.fillStyle = "#ffffff";
-        this.ctx.fillText("STAGE 1 (CURVE OK)", 12, 46);
+        
+        // Alerte si on sort de la route (Neige profonde)
+        if (this.playerX < -1.1 || this.playerX > 1.1) {
+            this.ctx.fillStyle = "#ffcc00";
+            this.ctx.fillText("⚠️ GLISSEMENT HORS-PISTE !", 12, 46);
+            // On réduit drastiquement la vitesse si on roule dans la poudreuse
+            if (this.speed > 60) this.speed -= 5;
+        }
     }
 }
 
